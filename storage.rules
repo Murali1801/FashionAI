@@ -1,0 +1,42 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // User profile photos - users can only upload/access their own photos
+    match /users/{userId}/profile-photos/{photoId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // User measurement photos - for AI analysis
+    match /users/{userId}/measurement-photos/{photoId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Validate file type (only images)
+      allow write: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.size < 10 * 1024 * 1024 // 10MB max
+        && request.resource.contentType.matches('image/.*');
+    }
+    
+    // User outfit photos - for style tracking
+    match /users/{userId}/outfit-photos/{photoId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Validate file type and size
+      allow write: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024 // 5MB max
+        && request.resource.contentType.matches('image/.*');
+    }
+    
+    // Public fashion item images (read-only for authenticated users)
+    match /fashion-items/{itemId}/images/{imageId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only admins can upload fashion item images
+    }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+} 

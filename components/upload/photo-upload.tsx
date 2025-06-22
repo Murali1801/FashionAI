@@ -7,12 +7,20 @@ import { Button } from "@/components/ui/button"
 import { Navigation } from "@/components/navigation"
 import { UploadCloud, Loader2, PartyPopper, AlertCircle, RefreshCcw, Camera } from "lucide-react"
 import Image from "next/image"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { useAuth } from "@/components/auth-provider"
+
+// Add Cloudinary config constants at the top
+const CLOUDINARY_UPLOAD_PRESET = "upload";
+const CLOUDINARY_CLOUD_NAME = "dadz5dzth";
 
 export function PhotoUpload() {
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [status, setStatus] = useState<"idle" | "uploading" | "analyzing" | "completed" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth();
 
   const onDrop = useCallback((acceptedFiles: File[], fileRejections: any[]) => {
     setError(null)
@@ -39,16 +47,40 @@ export function PhotoUpload() {
     multiple: false,
   })
 
-  const handleAnalyze = async () => {
-    if (!file) return
-    setStatus("uploading")
-    // Simulate upload
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setStatus("analyzing")
-    // Simulate analysis
-    await new Promise((resolve) => setTimeout(resolve, 3000))
-    setStatus("completed")
-  }
+  const handleUpload = async () => {
+    if (!file) return;
+    setStatus("uploading");
+    setError(null);
+    try {
+      // Upload to Cloudinary
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to upload image to Cloudinary.");
+      }
+      const data = await response.json();
+      const imageUrl = data.secure_url;
+      setStatus("completed");
+      // Save to Firestore if user is logged in
+      if (user?.id) {
+        await addDoc(collection(db, "users", user.id, "photos"), {
+          url: imageUrl,
+          uploadedAt: serverTimestamp(),
+        });
+      }
+    } catch (err: any) {
+      setError(err.message || "An error occurred during upload.");
+      setStatus("error");
+    }
+  };
 
   const handleReset = () => {
     setFile(null)
@@ -74,32 +106,12 @@ export function PhotoUpload() {
             <div className="w-20 h-20 mx-auto bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center ring-4 ring-green-200 dark:ring-green-800/50">
               <PartyPopper className="h-10 w-10 text-green-600 dark:text-green-400" />
             </div>
-            <h2 className="text-2xl font-bold">Analysis Complete!</h2>
-            <p className="text-muted-foreground">
-              We've extracted your measurements. You can view them in your profile.
-            </p>
-            <Card className="text-left shadow-inner bg-gradient-to-br from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-100 dark:border-purple-800/30">
-              <CardHeader>
-                <CardTitle className="text-lg">Your AI-Generated Measurements</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                  <div><span className="font-semibold">Height:</span> 175cm</div>
-                  <div><span className="font-semibold">Chest:</span> 98cm</div>
-                  <div><span className="font-semibold">Waist:</span> 82cm</div>
-                  <div><span className="font-semibold">Hips:</span> 95cm</div>
-                  <div><span className="font-semibold">Shoulders:</span> 45cm</div>
-                  <div><span className="font-semibold">Inseam:</span> 80cm</div>
-                </div>
-              </CardContent>
-            </Card>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button onClick={handleReset} variant="outline">
-                <RefreshCcw className="mr-2 h-4 w-4" />
-                Analyze Another Photo
-              </Button>
-              <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white">View Recommendations</Button>
-            </div>
+            <h2 className="text-2xl font-bold">Upload Complete!</h2>
+            <p className="text-muted-foreground">Your photo has been uploaded successfully.</p>
+            <Button onClick={handleReset} variant="outline">
+              <RefreshCcw className="mr-2 h-4 w-4" />
+              Upload Another Photo
+            </Button>
           </div>
         )
       case "error":
@@ -139,12 +151,12 @@ export function PhotoUpload() {
             <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-end">
               <Button variant="outline" onClick={handleReset} disabled={!file}>Cancel</Button>
               <Button 
-                onClick={handleAnalyze} 
+                onClick={handleUpload} 
                 disabled={!file}
                 className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
               >
                 <Camera className="mr-2 h-4 w-4" />
-                Analyze Photo
+                Upload Photo
               </Button>
             </div>
           </>
@@ -158,9 +170,9 @@ export function PhotoUpload() {
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
         <div className="mb-6 sm:mb-8 text-center">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">Photo Analysis</h1>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">Upload Photo</h1>
           <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
-            Upload your full-body photo for AI-powered measurements and personalized style recommendations
+            Upload your full-body photo to store it securely and use it for your style journey.
           </p>
         </div>
 

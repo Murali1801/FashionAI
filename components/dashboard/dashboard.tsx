@@ -1,22 +1,36 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { Navigation } from "@/components/navigation"
-import { Camera, User, Sparkles, TrendingUp, ShoppingBag, Clock, Activity } from "lucide-react"
+import { Camera, User, Sparkles, TrendingUp, ShoppingBag, Clock, Activity, Ruler } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { collection, getDocs, orderBy, query } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export function Dashboard() {
   const { user } = useAuth()
+  const [photos, setPhotos] = useState<{ url: string; uploadedAt?: any }[]>([])
 
   useEffect(() => {
     if (user?.inAppNotificationsEnabled) {
       toast.success(`Welcome to your dashboard, ${user?.name || 'style seeker'}!`)
     }
   }, [user?.name, user?.inAppNotificationsEnabled])
+
+  useEffect(() => {
+    if (user?.id) {
+      const fetchPhotos = async () => {
+        const q = query(collection(db, "users", user.id, "photos"), orderBy("uploadedAt", "desc"))
+        const snapshot = await getDocs(q)
+        setPhotos(snapshot.docs.map(doc => doc.data() as { url: string; uploadedAt?: any }))
+      }
+      fetchPhotos()
+    }
+  }, [user?.id])
 
   return (
     <div className="min-h-screen bg-background">
@@ -37,17 +51,35 @@ export function Dashboard() {
                 Upload Photo
               </CardTitle>
               <CardDescription>
-                Get AI-powered measurements and recommendations
+                Upload your full-body photo to your account
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Link href="/upload">
                 <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white">
-                  Start Analysis
+                  Upload Photo
                 </Button>
               </Link>
             </CardContent>
           </Card>
+
+          {/* Analyze Photos Card */}
+          <Link href="/analyze" className="block">
+            <Card className="shadow-lg border-0 hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-br from-green-50/50 via-transparent to-blue-50/50 dark:from-green-950/20 dark:via-transparent dark:to-blue-950/20 cursor-pointer">
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg sm:text-xl">
+                  <Ruler className="mr-2 h-5 w-5 text-green-600 dark:text-green-400" />
+                  Analyze Photos
+                </CardTitle>
+                <CardDescription>Get your body measurements from uploaded photos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white">
+                  Analyze Photos
+                </Button>
+              </CardContent>
+            </Card>
+          </Link>
 
           <Card className="shadow-lg border-0 hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-br from-purple-50/50 via-transparent to-blue-50/50 dark:from-purple-950/20 dark:via-transparent dark:to-blue-950/20">
             <CardHeader>
@@ -66,22 +98,23 @@ export function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-lg border-0 hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-br from-purple-50/50 via-transparent to-blue-50/50 dark:from-purple-950/20 dark:via-transparent dark:to-blue-950/20">
-            <CardHeader>
-              <CardTitle className="flex items-center text-lg sm:text-xl">
-                <User className="mr-2 h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                Profile Settings
-              </CardTitle>
-              <CardDescription>Update your measurements and preferences</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/profile">
+          {/* Uploaded Photos Card */}
+          <Link href="/files" className="block">
+            <Card className="shadow-lg border-0 hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-br from-blue-50/50 via-transparent to-purple-50/50 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20 cursor-pointer">
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg sm:text-xl">
+                  <Camera className="mr-2 h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  Uploaded Photos
+                </CardTitle>
+                <CardDescription>View and manage your uploaded photos</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white">
-                  Edit Profile
+                  View Uploaded Photos
                 </Button>
-              </Link>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Stats Overview */}
